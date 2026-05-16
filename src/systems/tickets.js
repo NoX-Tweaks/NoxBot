@@ -4,6 +4,7 @@ const {
   ButtonStyle,
   ChannelType,
   EmbedBuilder,
+  MessageFlags,
   PermissionsBitField,
   StringSelectMenuBuilder
 } = require("discord.js");
@@ -19,7 +20,7 @@ async function sendTicketPanel(interaction, config) {
   if (validation.length) {
     return interaction.reply({
       content: `Antes de enviar o painel, corrija:\n${validation.map(item => `- ${item}`).join("\n")}`,
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 
@@ -53,9 +54,9 @@ async function sendTicketPanel(interaction, config) {
 
   const sent = await channel.send({ embeds: [embed], components }).catch(error => ({ error }));
   if (sent?.error) {
-    return interaction.reply({ content: `Nao consegui enviar o painel: ${sent.error.message}`, ephemeral: true });
+    return interaction.reply({ content: `Nao consegui enviar o painel: ${sent.error.message}`, flags: MessageFlags.Ephemeral });
   }
-  return interaction.reply({ content: `Painel enviado em ${channel}.`, ephemeral: true });
+  return interaction.reply({ content: `Painel enviado em ${channel}.`, flags: MessageFlags.Ephemeral });
 }
 
 async function openTicket(interaction) {
@@ -66,8 +67,8 @@ async function openTicket(interaction) {
   const option = optionId ? (basePanel.selectOptions || []).find(item => item.id === optionId) : null;
   const panel = applyTicketOption(basePanel, option);
   const existing = findExistingTicket(config, interaction.user.id, panel);
-  if (existing) return interaction.reply({ content: `Voce ja tem um ticket aberto: <#${existing[0]}>`, ephemeral: true });
-  await interaction.deferReply({ ephemeral: true });
+  if (existing) return interaction.reply({ content: `Voce ja tem um ticket aberto: <#${existing[0]}>`, flags: MessageFlags.Ephemeral });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const updated = saveGuildConfig(interaction.guild.id, cfg => { cfg.ticket.counter += 1; });
   const number = String(updated.ticket.counter).padStart(4, "0");
@@ -219,9 +220,9 @@ function cleanEmoji(value) {
 
 async function claimTicket(interaction) {
   const config = getGuildConfig(interaction.guild.id);
-  if (!isTicketStaff(interaction.member, config)) return interaction.reply({ content: "Apenas a equipe pode assumir tickets.", ephemeral: true });
+  if (!isTicketStaff(interaction.member, config)) return interaction.reply({ content: "Apenas a equipe pode assumir tickets.", flags: MessageFlags.Ephemeral });
   const ticket = config.tickets[interaction.channel.id];
-  if (!ticket?.open) return interaction.reply({ content: "Este canal nao e um ticket aberto.", ephemeral: true });
+  if (!ticket?.open) return interaction.reply({ content: "Este canal nao e um ticket aberto.", flags: MessageFlags.Ephemeral });
   saveGuildConfig(interaction.guild.id, cfg => { cfg.tickets[interaction.channel.id].claimedBy = interaction.user.id; });
   await interaction.reply(`${interaction.user} assumiu este ticket.`);
   return sendLog(interaction.guild, "ticket", userLogEmbed("Ticket assumido", interaction.member || interaction.user, [
@@ -233,9 +234,9 @@ async function claimTicket(interaction) {
 async function closeTicket(interaction, reason = "Sem motivo informado.") {
   const config = getGuildConfig(interaction.guild.id);
   const ticket = config.tickets[interaction.channel.id];
-  if (!ticket?.open) return interaction.reply({ content: "Este canal nao e um ticket aberto.", ephemeral: true });
+  if (!ticket?.open) return interaction.reply({ content: "Este canal nao e um ticket aberto.", flags: MessageFlags.Ephemeral });
   if (interaction.user.id !== ticket.ownerId && !isTicketStaff(interaction.member, config)) {
-    return interaction.reply({ content: "Voce nao pode fechar este ticket.", ephemeral: true });
+    return interaction.reply({ content: "Voce nao pode fechar este ticket.", flags: MessageFlags.Ephemeral });
   }
 
   const messages = await interaction.channel.messages.fetch({ limit: 100 }).catch(() => null);
@@ -371,7 +372,7 @@ function ticketOpenedReply(interaction, channel, config) {
 
 async function deleteTicket(interaction) {
   const config = getGuildConfig(interaction.guild.id);
-  if (!isTicketStaff(interaction.member, config)) return interaction.reply({ content: "Apenas a equipe pode deletar tickets.", ephemeral: true });
+  if (!isTicketStaff(interaction.member, config)) return interaction.reply({ content: "Apenas a equipe pode deletar tickets.", flags: MessageFlags.Ephemeral });
   await interaction.reply("Deletando ticket em 5 segundos...");
   setTimeout(() => interaction.channel.delete("Ticket deletado").catch(() => null), 5000);
 }

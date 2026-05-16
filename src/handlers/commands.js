@@ -418,6 +418,7 @@ function getLastCommitInfo() {
     const output = execFileSync("git", ["log", "-1", "--pretty=format:%h%n%an%n%ad%n%s", "--date=short"], {
       cwd: process.cwd(),
       encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
       timeout: 3000
     });
     const [hash, author, date, ...messageParts] = output.split(/\r?\n/);

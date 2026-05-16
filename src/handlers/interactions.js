@@ -2,6 +2,7 @@ const {
   ActionRowBuilder,
   ChannelSelectMenuBuilder,
   ChannelType,
+  MessageFlags,
   RoleSelectMenuBuilder,
   TextInputStyle
 } = require("discord.js");
@@ -82,7 +83,7 @@ async function handleInteractionCreate(interaction) {
     if (interaction.isButton() || interaction.isAnySelectMenu()) {
       const publicTicketAction = /^ticket:open(?:Button)?:/.test(interaction.customId) || ["ticket:claim", "ticket:close", "ticket:delete"].includes(interaction.customId);
       if (!publicTicketAction && !hasMenuAccess(interaction.member)) {
-        return interaction.reply({ content: `${interaction.member}, voce nao tem acesso ao painel. Peca para alguem que tenha permissao liberar voce.`, ephemeral: true });
+        return interaction.reply({ content: `${interaction.member}, voce nao tem acesso ao painel. Peca para alguem que tenha permissao liberar voce.`, flags: MessageFlags.Ephemeral });
       }
     }
 
@@ -90,6 +91,7 @@ async function handleInteractionCreate(interaction) {
     if (interaction.isAnySelectMenu()) return await handleSelect(interaction);
     if (interaction.isModalSubmit()) return await handleModal(interaction);
   } catch (error) {
+    if (isIgnorableInteractionError(error)) return null;
     console.error("Erro ao processar interacao:", error);
     recordError("interaction", error, {
       guildId: interaction.guild?.id,
@@ -97,10 +99,14 @@ async function handleInteractionCreate(interaction) {
       customId: interaction.customId || null
     });
     const detail = error?.message ? `\nDetalhe: \`${String(error.message).slice(0, 180)}\`` : "";
-    const payload = { content: `Nao consegui concluir essa acao. Verifique as permissoes e os dados enviados.${detail}`, ephemeral: true };
+    const payload = { content: `Nao consegui concluir essa acao. Verifique as permissoes e os dados enviados.${detail}`, flags: MessageFlags.Ephemeral };
     if (interaction.deferred || interaction.replied) return interaction.followUp(payload).catch(() => null);
     return interaction.reply(payload).catch(() => null);
   }
+}
+
+function isIgnorableInteractionError(error) {
+  return error?.code === 10062 || error?.code === 40060;
 }
 
 async function handleButton(interaction) {
@@ -126,7 +132,7 @@ async function handleButton(interaction) {
 
   if (interaction.customId === "botcall:connect") {
     const result = await connectCall24h(interaction.guild);
-    if (!result.ok) return interaction.reply({ content: result.reason || "Nao consegui conectar nessa call.", ephemeral: true });
+    if (!result.ok) return interaction.reply({ content: result.reason || "Nao consegui conectar nessa call.", flags: MessageFlags.Ephemeral });
     const updated = markCall24hConnected(interaction.guild.id);
     await sendLog(interaction.guild, "basic", userLogEmbed("Bot conectado em call", interaction.member || interaction.user, [
       `Canal: ${result.channel}`,
@@ -179,7 +185,7 @@ async function handleButton(interaction) {
 
   if (interaction.customId === "server:back") return interaction.update(serverMenu(config, interaction.user, interaction.client.user));
   if (interaction.customId === "server:placeholder") {
-    return interaction.reply({ content: "Essa parte visual ja esta criada. A configuracao avancada entra na proxima etapa.", ephemeral: true });
+    return interaction.reply({ content: "Essa parte visual ja esta criada. A configuracao avancada entra na proxima etapa.", flags: MessageFlags.Ephemeral });
   }
 
   if (interaction.customId === "server:autoroleToggle") {
@@ -290,14 +296,14 @@ async function handleButton(interaction) {
     const embed = logEmbed("Bem-vindo", text, config.menuColor);
     if (config.welcome?.image) embed.setImage(config.welcome.image);
     const payload = config.welcome?.mode === "Embed"
-      ? { embeds: [embed], ephemeral: true }
-      : { content: text, ephemeral: true };
+      ? { embeds: [embed], flags: MessageFlags.Ephemeral }
+      : { content: text, flags: MessageFlags.Ephemeral };
     return interaction.reply(payload);
   }
 
   if (interaction.customId === "server:welcomeImage") {
     setUploadSession(interaction.guild.id, interaction.user.id, "welcomeImage");
-    return interaction.reply({ content: "Envie a imagem de boas-vindas como anexo em ate 5 minutos.", ephemeral: true });
+    return interaction.reply({ content: "Envie a imagem de boas-vindas como anexo em ate 5 minutos.", flags: MessageFlags.Ephemeral });
   }
 
   if (interaction.customId === "server:welcomeClearImage") {
@@ -316,7 +322,7 @@ async function handleButton(interaction) {
 
   if (interaction.customId === "server:autoreactionList") {
     const items = config.autoReactions?.items || [];
-    return interaction.reply({ content: items.length ? items.map((item, i) => `${i + 1}. Canal: ${item.channelId ? `<#${item.channelId}>` : "todos"} | Emojis: ${item.emojis.join(" ")}`).join("\n") : "Nenhuma auto reacao configurada.", ephemeral: true });
+    return interaction.reply({ content: items.length ? items.map((item, i) => `${i + 1}. Canal: ${item.channelId ? `<#${item.channelId}>` : "todos"} | Emojis: ${item.emojis.join(" ")}`).join("\n") : "Nenhuma auto reacao configurada.", flags: MessageFlags.Ephemeral });
   }
 
   if (interaction.customId === "server:autoreactionRemove") {
@@ -341,7 +347,7 @@ async function handleButton(interaction) {
 
   if (interaction.customId === "server:userreactionList") {
     const users = Object.entries(config.userReactions?.users || {});
-    return interaction.reply({ content: users.length ? users.map(([id, emojis]) => `<@${id}>: ${emojis.join(" ")}`).join("\n") : "Nenhuma reacao por usuario configurada.", ephemeral: true });
+    return interaction.reply({ content: users.length ? users.map(([id, emojis]) => `<@${id}>: ${emojis.join(" ")}`).join("\n") : "Nenhuma reacao por usuario configurada.", flags: MessageFlags.Ephemeral });
   }
 
   if (interaction.customId === "server:automessageAdd") {
@@ -355,7 +361,7 @@ async function handleButton(interaction) {
 
   if (interaction.customId === "server:automessageList") {
     const items = config.autoMessages?.items || [];
-    return interaction.reply({ content: items.length ? items.map((item, i) => `${i + 1}. <#${item.channelId}> | ${item.intervalMinutes}min | ${item.mode} | ${item.enabled ? "on" : "off"}`).join("\n") : "Nenhuma auto mensagem configurada.", ephemeral: true });
+    return interaction.reply({ content: items.length ? items.map((item, i) => `${i + 1}. <#${item.channelId}> | ${item.intervalMinutes}min | ${item.mode} | ${item.enabled ? "on" : "off"}`).join("\n") : "Nenhuma auto mensagem configurada.", flags: MessageFlags.Ephemeral });
   }
 
   if (interaction.customId === "server:automessageReset") {
@@ -400,12 +406,12 @@ async function handleButton(interaction) {
 
   if (interaction.customId === "custom:iconFile") {
     setUploadSession(interaction.guild.id, interaction.user.id, "avatar");
-    return interaction.reply({ content: "Envie uma imagem anexada neste canal em ate 5 minutos para virar o icon do bot.", ephemeral: true });
+    return interaction.reply({ content: "Envie uma imagem anexada neste canal em ate 5 minutos para virar o icon do bot.", flags: MessageFlags.Ephemeral });
   }
 
   if (interaction.customId === "custom:bannerFile") {
     setUploadSession(interaction.guild.id, interaction.user.id, "banner");
-    return interaction.reply({ content: "Envie uma imagem anexada neste canal em ate 5 minutos para virar o banner do bot.", ephemeral: true });
+    return interaction.reply({ content: "Envie uma imagem anexada neste canal em ate 5 minutos para virar o banner do bot.", flags: MessageFlags.Ephemeral });
   }
 
   if (interaction.customId === "security:back") {
@@ -436,10 +442,10 @@ async function handleButton(interaction) {
   if (interaction.customId.startsWith("embededit:")) {
     const [, action, ownerId] = interaction.customId.split(":");
     if (interaction.user.id !== ownerId && !hasMenuAccess(interaction.member)) {
-      return interaction.reply({ content: "Apenas quem abriu o editor ou alguem com acesso ao menu pode usar isso.", ephemeral: true });
+      return interaction.reply({ content: "Apenas quem abriu o editor ou alguem com acesso ao menu pode usar isso.", flags: MessageFlags.Ephemeral });
     }
     const session = getEmbedSession(interaction.guild.id, ownerId);
-    if (!session) return interaction.reply({ content: "Sessao de embed expirada. Use o comando novamente.", ephemeral: true });
+    if (!session) return interaction.reply({ content: "Sessao de embed expirada. Use o comando novamente.", flags: MessageFlags.Ephemeral });
 
     if (action === "edit") {
       return interaction.showModal(modal(`modal:embedEdit:${ownerId}`, "Editar embed", [
@@ -452,11 +458,11 @@ async function handleButton(interaction) {
     }
 
     const channel = interaction.guild.channels.cache.get(session.channelId);
-    if (!channel?.isTextBased()) return interaction.reply({ content: "Canal da embed nao encontrado.", ephemeral: true });
+    if (!channel?.isTextBased()) return interaction.reply({ content: "Canal da embed nao encontrado.", flags: MessageFlags.Ephemeral });
 
     if (action === "update") {
       const message = await channel.messages.fetch(session.messageId).catch(() => null);
-      if (!message) return interaction.reply({ content: "Mensagem original nao encontrada.", ephemeral: true });
+      if (!message) return interaction.reply({ content: "Mensagem original nao encontrada.", flags: MessageFlags.Ephemeral });
       await message.edit({ embeds: [buildSessionEmbed(session)] }).catch(() => null);
       return interaction.update(embedBuilderPanel(session, ownerId));
     }
@@ -470,11 +476,11 @@ async function handleButton(interaction) {
   if (interaction.customId.startsWith("embedbuilder:")) {
     const [, action, ownerId] = interaction.customId.split(":");
     if (interaction.user.id !== ownerId && !hasMenuAccess(interaction.member)) {
-      return interaction.reply({ content: "Apenas quem abriu o editor ou alguem com acesso ao menu pode usar isso.", ephemeral: true });
+      return interaction.reply({ content: "Apenas quem abriu o editor ou alguem com acesso ao menu pode usar isso.", flags: MessageFlags.Ephemeral });
     }
 
     const session = getEmbedSession(interaction.guild.id, ownerId);
-    if (!session) return interaction.reply({ content: "Sessao de embed expirada. Use o comando novamente.", ephemeral: true });
+    if (!session) return interaction.reply({ content: "Sessao de embed expirada. Use o comando novamente.", flags: MessageFlags.Ephemeral });
 
     if (action === "preview") {
       const panel = embedBuilderPanel(session, ownerId);
@@ -486,12 +492,12 @@ async function handleButton(interaction) {
     }
 
     const channel = interaction.guild.channels.cache.get(session.channelId);
-    if (!channel?.isTextBased()) return interaction.reply({ content: "Canal da embed nao encontrado.", ephemeral: true });
+    if (!channel?.isTextBased()) return interaction.reply({ content: "Canal da embed nao encontrado.", flags: MessageFlags.Ephemeral });
 
     if (action === "send") {
       if (session.messageId) {
         const targetMessage = await channel.messages.fetch(session.messageId).catch(() => null);
-        if (!targetMessage) return interaction.reply({ content: "Mensagem original nao encontrada.", ephemeral: true });
+        if (!targetMessage) return interaction.reply({ content: "Mensagem original nao encontrada.", flags: MessageFlags.Ephemeral });
         await targetMessage.edit({ embeds: [buildSessionEmbed(session)], components: buildSessionComponents(session) });
         return interaction.update(embedBuilderPanel(session, ownerId));
       }
@@ -607,7 +613,7 @@ async function handleButton(interaction) {
 
   if (interaction.customId === "ticket:previewPanel") {
     const panel = getTicketPanel(config, config.ticket.selectedPanelId);
-    return interaction.reply({ embeds: [buildTicketEmbed(panel, "panel", config)], ephemeral: true });
+    return interaction.reply({ embeds: [buildTicketEmbed(panel, "panel", config)], flags: MessageFlags.Ephemeral });
   }
 
   if (interaction.customId === "ticket:toggleSelect") {
@@ -653,7 +659,7 @@ async function handleButton(interaction) {
   if (interaction.customId === "ticket:selectEdit") {
     const panel = config.ticketPanels?.[config.ticket.selectedPanelId];
     const option = panel?.selectOptions?.find(item => item.id === panel.selectedSelectOptionId);
-    if (!option) return interaction.reply({ content: "Selecione uma opcao primeiro.", ephemeral: true });
+    if (!option) return interaction.reply({ content: "Selecione uma opcao primeiro.", flags: MessageFlags.Ephemeral });
     return promptTicketInput(interaction, "ticket:selectOption", [
       "Envie os dados da opcao no chat para salvar.",
       "Linha 1: titulo",
@@ -676,7 +682,7 @@ async function handleButton(interaction) {
   if (interaction.customId === "ticket:selectEmbed") {
     const panel = config.ticketPanels?.[config.ticket.selectedPanelId];
     const option = panel?.selectOptions?.find(item => item.id === panel.selectedSelectOptionId);
-    if (!option) return interaction.reply({ content: "Selecione uma opcao primeiro.", ephemeral: true });
+    if (!option) return interaction.reply({ content: "Selecione uma opcao primeiro.", flags: MessageFlags.Ephemeral });
     return promptTicketInput(interaction, "ticket:selectEmbed", [
       "Envie a embed interna desta opcao no chat.",
       "Linha 1: titulo",
@@ -688,7 +694,7 @@ async function handleButton(interaction) {
   if (interaction.customId === "ticket:selectAdvanced") {
     const panel = config.ticketPanels?.[config.ticket.selectedPanelId];
     const option = panel?.selectOptions?.find(item => item.id === panel.selectedSelectOptionId);
-    if (!option) return interaction.reply({ content: "Selecione uma opcao primeiro.", ephemeral: true });
+    if (!option) return interaction.reply({ content: "Selecione uma opcao primeiro.", flags: MessageFlags.Ephemeral });
     return interaction.showModal(modal("modal:ticketSelectAdvanced", "Config avancada da opcao", [
       { id: "category", label: "ID categoria opcional", value: option.categoryId || "" },
       { id: "prefix", label: "Prefixo do canal", value: option.channelPrefix || "ticket" },
@@ -779,7 +785,7 @@ async function handleButton(interaction) {
   if (interaction.customId === "ticket:deletePanel") {
     const selectedPanelId = config.ticket.selectedPanelId;
     if (!selectedPanelId || !config.ticketPanels?.[selectedPanelId]) {
-      return interaction.reply({ content: "Selecione um ticket criado antes de apagar.", ephemeral: true });
+      return interaction.reply({ content: "Selecione um ticket criado antes de apagar.", flags: MessageFlags.Ephemeral });
     }
 
     const updated = saveGuildConfig(interaction.guild.id, cfg => {
@@ -895,11 +901,11 @@ async function handleSelect(interaction) {
     }
     if (option === "iconFile") {
       setUploadSession(interaction.guild.id, interaction.user.id, "avatar");
-      return interaction.reply({ content: "Envie uma imagem anexada neste canal em ate 5 minutos para virar o icon do bot.", ephemeral: true });
+      return interaction.reply({ content: "Envie uma imagem anexada neste canal em ate 5 minutos para virar o icon do bot.", flags: MessageFlags.Ephemeral });
     }
     if (option === "bannerFile") {
       setUploadSession(interaction.guild.id, interaction.user.id, "banner");
-      return interaction.reply({ content: "Envie uma imagem anexada neste canal em ate 5 minutos para virar o banner do bot.", ephemeral: true });
+      return interaction.reply({ content: "Envie uma imagem anexada neste canal em ate 5 minutos para virar o banner do bot.", flags: MessageFlags.Ephemeral });
     }
   }
 
@@ -930,7 +936,7 @@ async function handleSelect(interaction) {
       return interaction.update({ content: null, embeds: ticketMenu(config, interaction.user, interaction.client.user).embeds, components: [row] });
     }
     if (value === "manage") {
-      if (!Object.keys(config.ticketPanels || {}).length) return interaction.reply({ content: "Nenhum ticket criado ainda.", ephemeral: true });
+      if (!Object.keys(config.ticketPanels || {}).length) return interaction.reply({ content: "Nenhum ticket criado ainda.", flags: MessageFlags.Ephemeral });
       return interaction.update(ticketManageListMenu(config));
     }
   }
@@ -997,11 +1003,11 @@ async function handleSelect(interaction) {
   if (interaction.customId.startsWith("embedbuilder:select:")) {
     const ownerId = interaction.customId.split(":")[2];
     if (interaction.user.id !== ownerId && !hasMenuAccess(interaction.member)) {
-      return interaction.reply({ content: "Apenas quem abriu o editor ou alguem com acesso ao menu pode usar isso.", ephemeral: true });
+      return interaction.reply({ content: "Apenas quem abriu o editor ou alguem com acesso ao menu pode usar isso.", flags: MessageFlags.Ephemeral });
     }
 
     const session = getEmbedSession(interaction.guild.id, ownerId);
-    if (!session) return interaction.reply({ content: "Sessao de embed expirada. Use o comando novamente.", ephemeral: true });
+    if (!session) return interaction.reply({ content: "Sessao de embed expirada. Use o comando novamente.", flags: MessageFlags.Ephemeral });
 
     const value = interaction.values[0];
     if (["content", "images", "extras", "buttons", "fields", "back"].includes(value)) {
@@ -1030,7 +1036,7 @@ async function handleSelect(interaction) {
 
     if (value === "send") {
       const channel = interaction.guild.channels.cache.get(session.channelId);
-      if (!channel?.isTextBased()) return interaction.reply({ content: "Canal da embed nao encontrado.", ephemeral: true });
+      if (!channel?.isTextBased()) return interaction.reply({ content: "Canal da embed nao encontrado.", flags: MessageFlags.Ephemeral });
       await channel.send({ embeds: [buildSessionEmbed(session)], components: buildSessionComponents(session) });
       return interaction.update(embedBuilderPanel(session, ownerId));
     }
@@ -1062,7 +1068,7 @@ async function handleSelect(interaction) {
     }
     if (value === "thumbnail" || value === "image") {
       setUploadSession(interaction.guild.id, interaction.user.id, value === "image" ? "embedImage" : "embedThumbnail", { page: "images" });
-      return interaction.reply({ content: `Envie ${value === "image" ? "a imagem principal" : "a thumbnail"} como anexo.`, ephemeral: true });
+      return interaction.reply({ content: `Envie ${value === "image" ? "a imagem principal" : "a thumbnail"} como anexo.`, flags: MessageFlags.Ephemeral });
     }
     if (value === "buttonAdd") {
       return interaction.showModal(modal(`modal:embedBuilder:button:${ownerId}`, "Adicionar Botao", [
@@ -1119,7 +1125,7 @@ async function handleSelect(interaction) {
   if (interaction.customId === "ticket:selectPanel") {
     const selectedPanelId = interaction.values[0];
     if (selectedPanelId === "none") {
-      return interaction.reply({ content: "Nenhum ticket criado ainda.", ephemeral: true });
+      return interaction.reply({ content: "Nenhum ticket criado ainda.", flags: MessageFlags.Ephemeral });
     }
 
     const updated = saveGuildConfig(interaction.guild.id, cfg => {
@@ -1131,7 +1137,7 @@ async function handleSelect(interaction) {
 
   if (interaction.customId === "ticket:selectOptionOpen") {
     const optionId = interaction.values[0];
-    if (optionId === "none") return interaction.reply({ content: "Nenhuma opcao criada ainda.", ephemeral: true });
+    if (optionId === "none") return interaction.reply({ content: "Nenhuma opcao criada ainda.", flags: MessageFlags.Ephemeral });
     const updated = saveGuildConfig(interaction.guild.id, cfg => {
       const panel = cfg.ticketPanels[cfg.ticket.selectedPanelId];
       if (panel) panel.selectedSelectOptionId = optionId;
@@ -1187,7 +1193,7 @@ async function handleSelect(interaction) {
   if (interaction.customId.startsWith("ticket:embedEdit:")) {
     const kind = interaction.customId.split(":")[2];
     const itemId = interaction.values[0];
-    if (itemId === "none") return interaction.reply({ content: "Nenhum item criado ainda.", ephemeral: true });
+    if (itemId === "none") return interaction.reply({ content: "Nenhum item criado ainda.", flags: MessageFlags.Ephemeral });
     saveGuildConfig(interaction.guild.id, cfg => {
       const panel = cfg.ticketPanels[cfg.ticket.selectedPanelId];
       if (!panel) return;
@@ -1199,7 +1205,7 @@ async function handleSelect(interaction) {
     const data = panel?.[key];
     const items = normalizeTicketEmbedItems(data?.items || []);
     const item = items.find(entry => entry.id === itemId);
-    if (!item) return interaction.reply({ content: "Item nao encontrado.", ephemeral: true });
+    if (!item) return interaction.reply({ content: "Item nao encontrado.", flags: MessageFlags.Ephemeral });
     if (item.type === "gallery") {
       return interaction.showModal(modal(`modal:ticketEmbedGallery:${kind}:${itemId}`, "Editar Galeria", [
         { id: "images", label: "Links das imagens (um por linha)", style: TextInputStyle.Paragraph, required: false, value: (item.images || []).join("\n") }
@@ -1347,12 +1353,12 @@ async function handleModal(interaction) {
   }
 
   if (!hasMenuAccess(interaction.member)) {
-    return interaction.reply({ content: `${interaction.member}, voce nao tem acesso ao painel. Peca para alguem que tenha permissao liberar voce.`, ephemeral: true });
+    return interaction.reply({ content: `${interaction.member}, voce nao tem acesso ao painel. Peca para alguem que tenha permissao liberar voce.`, flags: MessageFlags.Ephemeral });
   }
 
   if (interaction.customId === "modal:prefix") {
     const prefix = interaction.fields.getTextInputValue("prefix").trim();
-    if (!prefix || prefix.length > 5) return interaction.reply({ content: "Use um prefixo de 1 a 5 caracteres.", ephemeral: true });
+    if (!prefix || prefix.length > 5) return interaction.reply({ content: "Use um prefixo de 1 a 5 caracteres.", flags: MessageFlags.Ephemeral });
     const config = saveGuildConfig(interaction.guild.id, cfg => { cfg.prefix = prefix; });
     updateBotPresence(interaction.client, config.prefix);
     return interaction.update(customizeMenu(config, interaction.user, interaction.client.user));
@@ -1396,7 +1402,7 @@ async function handleModal(interaction) {
     const type = interaction.customId.split(":")[2];
     const channelId = interaction.fields.getTextInputValue("channel").trim();
     const channel = interaction.guild.channels.cache.get(channelId);
-    if (!channel?.isTextBased()) return interaction.reply({ content: "Canal invalido.", ephemeral: true });
+    if (!channel?.isTextBased()) return interaction.reply({ content: "Canal invalido.", flags: MessageFlags.Ephemeral });
     const config = saveGuildConfig(interaction.guild.id, cfg => {
       if (type === "ticket") cfg.ticket.logChannelId = channelId;
       else cfg.logs[type] = channelId;
@@ -1409,8 +1415,8 @@ async function handleModal(interaction) {
     const enabledInput = interaction.fields.getTextInputValue("enabled");
     const botsInput = interaction.fields.getTextInputValue("bots");
     const role = interaction.guild.roles.cache.get(roleId);
-    if (!role) return interaction.reply({ content: "Cargo invalido. Use o ID de um cargo do servidor.", ephemeral: true });
-    if (role.managed) return interaction.reply({ content: "Esse cargo e gerenciado por integracao e nao pode ser usado como autocargo.", ephemeral: true });
+    if (!role) return interaction.reply({ content: "Cargo invalido. Use o ID de um cargo do servidor.", flags: MessageFlags.Ephemeral });
+    if (role.managed) return interaction.reply({ content: "Esse cargo e gerenciado por integracao e nao pode ser usado como autocargo.", flags: MessageFlags.Ephemeral });
 
     const config = saveGuildConfig(interaction.guild.id, cfg => {
       cfg.autoRole.roleId = roleId;
@@ -1460,7 +1466,7 @@ async function handleModal(interaction) {
   if (interaction.customId === "modal:userReactionUsers") {
     const userId = interaction.fields.getTextInputValue("user").trim();
     const emojis = interaction.fields.getTextInputValue("emojis").split(/\s+/).map(item => item.trim()).filter(Boolean).slice(0, 5);
-    if (!/^\d{17,20}$/.test(userId)) return interaction.reply({ content: "ID de usuario invalido.", ephemeral: true });
+    if (!/^\d{17,20}$/.test(userId)) return interaction.reply({ content: "ID de usuario invalido.", flags: MessageFlags.Ephemeral });
     const config = saveGuildConfig(interaction.guild.id, cfg => {
       cfg.userReactions.users = cfg.userReactions.users || {};
       cfg.userReactions.users[userId] = emojis;
@@ -1474,7 +1480,7 @@ async function handleModal(interaction) {
     const intervalMinutes = Math.max(1, Math.min(1440, Number(interaction.fields.getTextInputValue("interval").trim()) || 60));
     const mode = interaction.fields.getTextInputValue("mode").trim().toLowerCase() === "embed" ? "embed" : "normal";
     const message = interaction.fields.getTextInputValue("message").trim();
-    if (!interaction.guild.channels.cache.get(channelId)?.isTextBased?.()) return interaction.reply({ content: "Canal invalido.", ephemeral: true });
+    if (!interaction.guild.channels.cache.get(channelId)?.isTextBased?.()) return interaction.reply({ content: "Canal invalido.", flags: MessageFlags.Ephemeral });
     const config = saveGuildConfig(interaction.guild.id, cfg => {
       cfg.autoMessages.items = cfg.autoMessages.items || [];
       const item = { id: `auto_${Date.now()}`, channelId, intervalMinutes, mode, message, enabled: true, lastSentAt: null };
@@ -1565,7 +1571,7 @@ async function handleModal(interaction) {
 
   if (interaction.customId === "modal:ticketRename") {
     const name = interaction.fields.getTextInputValue("name").trim().slice(0, 100);
-    if (!name) return interaction.reply({ content: "Nome invalido.", ephemeral: true });
+    if (!name) return interaction.reply({ content: "Nome invalido.", flags: MessageFlags.Ephemeral });
     const config = saveGuildConfig(interaction.guild.id, cfg => {
       const panelId = cfg.ticket.selectedPanelId;
       if (!panelId || !cfg.ticketPanels[panelId]) return;
@@ -1646,7 +1652,7 @@ async function handleModal(interaction) {
         channelId: interaction.channelId,
         messageId: interaction.message?.id || null
       });
-      return interaction.reply({ content: "Envie ate 10 imagens/GIFs como anexo ou cole links neste canal em ate 5 minutos.", ephemeral: true });
+      return interaction.reply({ content: "Envie ate 10 imagens/GIFs como anexo ou cole links neste canal em ate 5 minutos.", flags: MessageFlags.Ephemeral });
     }
     const config = saveGuildConfig(interaction.guild.id, cfg => {
       const panel = cfg.ticketPanels[cfg.ticket.selectedPanelId];
@@ -1823,7 +1829,7 @@ async function handleModal(interaction) {
 
   if (interaction.customId === "modal:embedTemplateSave") {
     const name = interaction.fields.getTextInputValue("name").trim().toLowerCase();
-    if (!name) return interaction.reply({ content: "Nome invalido.", ephemeral: true });
+    if (!name) return interaction.reply({ content: "Nome invalido.", flags: MessageFlags.Ephemeral });
     const config = saveGuildConfig(interaction.guild.id, cfg => {
       cfg.embed.templates = cfg.embed.templates || {};
       cfg.embed.templates[name] = {
@@ -1844,7 +1850,7 @@ async function handleModal(interaction) {
     const name = interaction.fields.getTextInputValue("name").trim().toLowerCase();
     const config = getGuildConfig(interaction.guild.id);
     const template = config.embed.templates?.[name];
-    if (!template) return interaction.reply({ content: "Template nao encontrado.", ephemeral: true });
+    if (!template) return interaction.reply({ content: "Template nao encontrado.", flags: MessageFlags.Ephemeral });
     const updated = saveGuildConfig(interaction.guild.id, cfg => {
       cfg.embed = { ...cfg.embed, ...template };
     });
@@ -1877,7 +1883,7 @@ async function handleModal(interaction) {
       if (field === "color") current.color = normalizeColor(value, current.color);
       else current[field] = value || null;
     });
-    if (!session) return interaction.reply({ content: "Sessao de embed expirada. Use o comando novamente.", ephemeral: true });
+    if (!session) return interaction.reply({ content: "Sessao de embed expirada. Use o comando novamente.", flags: MessageFlags.Ephemeral });
     const page = field === "button" ? "buttons" : field === "field" ? "fields" : ["thumbnail", "image"].includes(field) ? "images" : ["footer", "author"].includes(field) ? "extras" : "content";
     return interaction.update(embedBuilderPanel(session, ownerId, page));
   }
@@ -1891,7 +1897,7 @@ async function handleModal(interaction) {
       current.image = interaction.fields.getTextInputValue("image").trim() || null;
       current.footer = interaction.fields.getTextInputValue("footer").trim() || null;
     });
-    if (!session) return interaction.reply({ content: "Sessao de embed expirada. Use o comando novamente.", ephemeral: true });
+    if (!session) return interaction.reply({ content: "Sessao de embed expirada. Use o comando novamente.", flags: MessageFlags.Ephemeral });
     return interaction.update(embedBuilderPanel(session, ownerId));
   }
 }
@@ -1905,7 +1911,7 @@ async function promptTicketInput(interaction, type, content, data = {}) {
     channelId: interaction.channelId,
     messageId: interaction.message?.id || null
   });
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   return interaction.editReply({ content });
 }
 
