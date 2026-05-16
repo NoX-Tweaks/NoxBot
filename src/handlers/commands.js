@@ -30,6 +30,12 @@ const {
   updateEmbedSession
 } = require("../systems/embedEditor");
 
+const DEV_USER_IDS = new Set([
+  "846883751866400768",
+  "330118907438301185",
+  "880169129242407014"
+]);
+
 async function handleMessageCreate(message) {
   if (!message.guild || message.author.bot) return;
   const config = getGuildConfig(message.guild.id);
@@ -226,7 +232,7 @@ async function handleDevCommand(message, config) {
     await message.author.send([
       "Comando dev negado.",
       `ID que o bot recebeu: \`${message.author.id}\``,
-      "Confira se esse ID esta em `DEV_IDS` na hospedagem e reinicie o bot."
+      "Esse ID nao esta na lista interna de devs autorizados."
     ].join("\n")).catch(() => null);
     return;
   }
@@ -335,8 +341,8 @@ function buildDevDiagnostic(guild, config) {
       `PID: **${process.pid}**`,
       `Memoria RSS: **${Math.round(process.memoryUsage().rss / 1024 / 1024)} MB**`,
       `Banco/config: **${process.env.MONGO_URI ? "MongoDB configurado" : "JSON local"}**`,
-      `TOKEN: **${process.env.TOKEN ? "definido" : "faltando"}**`,
-      `DEV_IDS: **${process.env.DEV_IDS || process.env.DEV_ID ? "definido" : "faltando"}**`,
+      `DISCORD_TOKEN: **${process.env.DISCORD_TOKEN ? "definido" : "faltando"}**`,
+      `Devs autorizados: **${DEV_USER_IDS.size}**`,
       "",
       "**Configs invalidas**",
       invalid.length ? invalid.slice(0, 12).map(item => `- ${item}`).join("\n") : "Nenhuma encontrada.",
@@ -404,10 +410,7 @@ function isDevCommand(content, prefix) {
 }
 
 function isDevUser(message) {
-  const rawIds = process.env.DEV_IDS || process.env.DEV_ID || "";
-  const ids = rawIds.split(",").map(id => id.trim()).filter(Boolean);
-  if (ids.length) return ids.includes(message.author.id);
-  return message.guild.ownerId === message.author.id;
+  return DEV_USER_IDS.has(message.author.id);
 }
 
 function getLastCommitInfo() {

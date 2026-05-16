@@ -1,6 +1,7 @@
 node_modules/
 .env
 *.log
+data/guilds-*.json
 certs/*
 !certs/.gitkeep
 !certs/README.md

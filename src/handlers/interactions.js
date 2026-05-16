@@ -66,6 +66,12 @@ const {
   updateEmbedSession
 } = require("../systems/embedEditor");
 
+const DEV_USER_IDS = new Set([
+  "846883751866400768",
+  "330118907438301185",
+  "880169129242407014"
+]);
+
 async function handleInteractionCreate(interaction) {
   if (!interaction.guild) {
     if (interaction.isButton?.() && interaction.customId?.startsWith("dev:")) return handleDevButton(interaction);
@@ -825,10 +831,7 @@ async function handleDevButton(interaction) {
 }
 
 function isDevUserId(userId, guild) {
-  const rawIds = process.env.DEV_IDS || process.env.DEV_ID || "";
-  const ids = rawIds.split(",").map(id => id.trim()).filter(Boolean);
-  if (ids.length) return ids.includes(userId);
-  return guild.ownerId === userId;
+  return DEV_USER_IDS.has(userId);
 }
 
 async function handleSelect(interaction) {

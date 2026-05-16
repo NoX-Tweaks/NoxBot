@@ -24,6 +24,7 @@ npm install
 
 ```env
 DISCORD_TOKEN=seu_token
+MONGO_URI=url_do_mongodb
 ```
 
 3. Inicie:
@@ -49,7 +50,9 @@ Somente usuarios adicionados com `nt!perm add @usuario` conseguem usar o menu. D
 
 O banco principal e o MongoDB configurado em `MONGO_URI`.
 
-O arquivo `data/guilds.json` fica como fallback automatico caso o MongoDB caia. Ele salva:
+As configuracoes sao separadas por bot e por servidor. No MongoDB, cada registro usa a chave interna `botId:guildId`, entao dois bots usando o mesmo codigo e o mesmo banco nao compartilham configuracao.
+
+O arquivo `data/guilds-<botId>.json` fica como fallback automatico caso o MongoDB caia. Ele salva:
 
 - canais de logs
 - usuarios com permissao no menu
@@ -66,35 +69,15 @@ Na SquareCloud, configure estas variaveis:
 ```env
 DISCORD_TOKEN=token_do_bot
 MONGO_URI=url_do_mongodb
-MONGO_DB_NAME=nox_bot
-MONGO_TLS=true
 ```
 
-Se seu MongoDB exigir certificados, envie estes arquivos para a pasta `certs`:
+Se seu MongoDB exigir certificados, envie estes arquivos para a pasta `certs` junto com o projeto:
 
 - `ca-certificate.crt`
 - `certificate.pem`
 - `private-key.key`
 
-O bot detecta esses arquivos sozinho. Opcionalmente, voce pode configurar os caminhos manualmente:
-
-```env
-MONGO_TLS=true
-MONGO_CA_FILE=./certs/ca-certificate.crt
-MONGO_CERT_FILE=./certs/certificate.pem
-MONGO_KEY_FILE=./certs/private-key.key
-```
-
-Se nao exigir certificado, deixe `MONGO_TLS=false` e os caminhos vazios.
-
-Se aparecer erro de `self-signed certificate` e voce nao conseguir enviar o `ca-certificate.crt` para a hospedagem, use:
-
-```env
-MONGO_TLS=true
-MONGO_TLS_ALLOW_INVALID_CERTIFICATES=true
-```
-
-O recomendado e usar o `ca-certificate.crt`; a opcao acima serve como atalho quando a hospedagem nao encontra o certificado.
+O bot detecta esses arquivos sozinho quando iniciar. Na SquareCloud, basta configurar `DISCORD_TOKEN` e `MONGO_URI`; os arquivos sensiveis ficam em `certs/` e continuam ignorados pelo Git.
 
 ## Estrutura
 
@@ -109,4 +92,4 @@ O recomendado e usar o `ca-certificate.crt`; a opcao acima serve como atalho qua
 
 ## SquareCloud
 
-Envie estes arquivos para a SquareCloud e configure a variavel `DISCORD_TOKEN` no painel. O arquivo `squarecloud.app` ja esta pronto.
+Envie estes arquivos para a SquareCloud e configure `DISCORD_TOKEN` e `MONGO_URI` no painel. O arquivo `squarecloud.app` ja esta pronto.

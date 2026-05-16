@@ -1,15 +1,17 @@
 const fs = require("fs");
 const path = require("path");
 const { MongoClient } = require("mongodb");
-const { defaultGuildConfig } = require("../config/defaultConfig");
+const { DEFAULT_PREFIX, defaultGuildConfig } = require("../config/defaultConfig");
 
 const DATA_DIR = path.join(__dirname, "..", "..", "data");
-const DB_PATH = path.join(DATA_DIR, "guilds.json");
 const CERTS_DIR = path.join(__dirname, "..", "..", "certs");
 const DEFAULT_CA_FILE = path.join(CERTS_DIR, "ca-certificate.crt");
 const DEFAULT_CERT_FILE = path.join(CERTS_DIR, "certificate.pem");
 const DEFAULT_KEY_FILE = path.join(CERTS_DIR, "private-key.key");
+const DATABASE_NAME = "nox_bot";
 const COLLECTION_NAME = "guilds";
+const BOT_SCOPE = resolveBotScope();
+const DB_PATH = path.join(DATA_DIR, `guilds-${BOT_SCOPE}.json`);
 
 let cache = {};
 let mongoClient = null;
@@ -36,6 +38,38 @@ function writeDb(db) {
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
 }
 
+function resolveBotScope() {
+  const tokenBotId = parseBotIdFromToken(process.env.DISCORD_TOKEN);
+  return sanitizeStorageId(tokenBotId || "default");
+}
+
+function parseBotIdFromToken(token) {
+  const firstPart = String(token || "").split(".")[0];
+  if (!firstPart) return null;
+
+  try {
+    const normalized = firstPart.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(normalized.length + ((4 - normalized.length % 4) % 4), "=");
+    const decoded = Buffer.from(padded, "base64").toString("utf8");
+    return /^\d{17,20}$/.test(decoded) ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeStorageId(value) {
+  return String(value || "default").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) || "default";
+}
+
+function storageKey(guildId) {
+  return `${BOT_SCOPE}:${guildId}`;
+}
+
+function unscopedGuildId(key) {
+  const prefix = `${BOT_SCOPE}:`;
+  return String(key).startsWith(prefix) ? String(key).slice(prefix.length) : String(key);
+}
+
 function mergeDefaults(base, saved) {
   const result = Array.isArray(base) ? [...base] : { ...base };
   for (const [key, value] of Object.entries(saved || {})) {
@@ -55,15 +89,22 @@ function mergeDefaults(base, saved) {
   return result;
 }
 
+function migrateGuildConfig(config) {
+  if (config?.prefix === "x") {
+    config.prefix = DEFAULT_PREFIX;
+  }
+  return config;
+}
+
 function buildMongoOptions() {
   const options = {
     serverSelectionTimeoutMS: 8000
   };
-  const caFile = process.env.MONGO_CA_FILE || DEFAULT_CA_FILE;
-  const certFile = process.env.MONGO_CERT_FILE || DEFAULT_CERT_FILE;
-  const keyFile = process.env.MONGO_KEY_FILE || DEFAULT_KEY_FILE;
+  const caFile = DEFAULT_CA_FILE;
+  const certFile = DEFAULT_CERT_FILE;
+  const keyFile = DEFAULT_KEY_FILE;
 
-  if (process.env.MONGO_TLS === "true" || fs.existsSync(caFile) || fs.existsSync(certFile) || fs.existsSync(keyFile)) {
+  if (fs.existsSync(caFile) || fs.existsSync(certFile) || fs.existsSync(keyFile)) {
     options.tls = true;
   }
 
@@ -80,11 +121,6 @@ function buildMongoOptions() {
   if (fs.existsSync(keyFile)) {
     options.key = fs.readFileSync(path.resolve(keyFile));
     options.tls = true;
-  }
-
-  if (process.env.MONGO_TLS_ALLOW_INVALID_CERTIFICATES === "true") {
-    options.tls = true;
-    options.tlsAllowInvalidCertificates = true;
   }
 
   return options;
@@ -112,20 +148,20 @@ async function connectMongo() {
     if (mongoClient) await mongoClient.close().catch(() => null);
     mongoClient = new MongoClient(process.env.MONGO_URI, buildMongoOptions());
     await mongoClient.connect();
-    const db = mongoClient.db(process.env.MONGO_DB_NAME || "nox_bot");
+    const db = mongoClient.db(DATABASE_NAME);
     mongoCollection = db.collection(COLLECTION_NAME);
 
-    const docs = await mongoCollection.find({}).toArray();
+    const docs = await mongoCollection.find({ botId: BOT_SCOPE }).toArray();
     const mongoData = {};
     for (const doc of docs) {
-      mongoData[doc._id] = mergeDefaults(defaultGuildConfig(), doc.config || {});
+      mongoData[doc._id] = migrateGuildConfig(mergeDefaults(defaultGuildConfig(), doc.config || {}));
     }
 
     cache = mergeDefaults(cache, mongoData);
     writeDb(cache);
     await syncCacheToMongo();
     mongoOnline = true;
-    console.log("MongoDB conectado. JSON local ficou como fallback.");
+    console.log(`MongoDB conectado para bot ${BOT_SCOPE}. JSON local ficou como fallback.`);
   } catch (error) {
     mongoOnline = false;
     console.error("Nao foi possivel conectar ao MongoDB. Usando JSON local como fallback.", error.message);
@@ -138,7 +174,7 @@ async function syncCacheToMongo() {
   const operations = Object.entries(cache).map(([guildId, config]) => ({
     updateOne: {
       filter: { _id: guildId },
-      update: { $set: { config, updatedAt: new Date() } },
+      update: { $set: { botId: BOT_SCOPE, guildId: unscopedGuildId(guildId), config, updatedAt: new Date() } },
       upsert: true
     }
   }));
@@ -152,7 +188,7 @@ async function persistGuildToMongo(guildId, config) {
   try {
     await mongoCollection.updateOne(
       { _id: guildId },
-      { $set: { config, updatedAt: new Date() } },
+      { $set: { botId: BOT_SCOPE, guildId: unscopedGuildId(guildId), config, updatedAt: new Date() } },
       { upsert: true }
     );
   } catch (error) {
@@ -172,7 +208,7 @@ async function getDatabaseStatus() {
 
   const startedAt = Date.now();
   try {
-    await mongoClient.db(process.env.MONGO_DB_NAME || "nox_bot").admin().ping();
+    await mongoClient.db(DATABASE_NAME).admin().ping();
     return { online: true, type: "MongoDB", pingMs: Date.now() - startedAt };
   } catch (error) {
     mongoOnline = false;
@@ -181,27 +217,29 @@ async function getDatabaseStatus() {
 }
 
 function getGuildConfig(guildId) {
-  if (!cache[guildId]) {
-    cache[guildId] = defaultGuildConfig();
+  const key = storageKey(guildId);
+  if (!cache[key]) {
+    cache[key] = defaultGuildConfig();
     writeDb(cache);
-    persistGuildToMongo(guildId, cache[guildId]);
+    persistGuildToMongo(key, cache[key]);
   } else {
-    const merged = mergeDefaults(defaultGuildConfig(), cache[guildId]);
-    if (JSON.stringify(merged) !== JSON.stringify(cache[guildId])) {
-      cache[guildId] = merged;
+    const merged = migrateGuildConfig(mergeDefaults(defaultGuildConfig(), cache[key]));
+    if (JSON.stringify(merged) !== JSON.stringify(cache[key])) {
+      cache[key] = merged;
       writeDb(cache);
-      persistGuildToMongo(guildId, cache[guildId]);
+      persistGuildToMongo(key, cache[key]);
     }
   }
-  return cache[guildId];
+  return cache[key];
 }
 
 function saveGuildConfig(guildId, updater) {
-  cache[guildId] = mergeDefaults(defaultGuildConfig(), cache[guildId]);
-  updater(cache[guildId]);
+  const key = storageKey(guildId);
+  cache[key] = migrateGuildConfig(mergeDefaults(defaultGuildConfig(), cache[key]));
+  updater(cache[key]);
   writeDb(cache);
-  persistGuildToMongo(guildId, cache[guildId]);
-  return cache[guildId];
+  persistGuildToMongo(key, cache[key]);
+  return cache[key];
 }
 
 module.exports = {
