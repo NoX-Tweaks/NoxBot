@@ -8,8 +8,8 @@ Bot em JavaScript pronto para SquareCloud com:
 - Sistema de autocargo configuravel pelo menu
 - Sistema de seguranca ativavel pelo menu
 - Sistema de embed pelo menu
-- Menu completo pelo comando `xmenu`
-- Comando `xperm` para liberar acesso ao menu por lista de permissao
+- Menu completo pelo comando `nt!menu`
+- Comando `nt!perm` para liberar acesso ao menu por lista de permissao
 - Status: assistindo `Nox Tweaks`
 
 ## Como rodar
@@ -34,16 +34,16 @@ npm start
 
 ## Comandos
 
-- `xmenu` abre o painel principal.
-- `xhelp` mostra a lista de comandos usando o prefixo atual.
-- `xbot-call` abre um seletor para escolher a call e entrar mutado ou desmutado.
-- `xembed editar <id_mensagem>` abre o editor visual de uma embed.
-- `xaddemoji <emoji_ou_url> [nome]` adiciona emoji de outro servidor ou URL.
-- `xperm add @usuario` libera um usuario para usar o menu.
-- `xperm remove @usuario` remove o acesso.
-- `xperm list` mostra usuarios liberados.
+- `nt!menu` abre o painel principal.
+- `nt!help` mostra a lista de comandos usando o prefixo atual.
+- `nt!bot-call` abre um seletor para escolher a call e entrar mutado ou desmutado.
+- `nt!embed editar <id_mensagem>` abre o editor visual de uma embed.
+- `nt!addemoji <emoji_ou_url> [nome]` adiciona emoji de outro servidor ou URL.
+- `nt!perm add @usuario` libera um usuario para usar o menu.
+- `nt!perm remove @usuario` remove o acesso.
+- `nt!perm list` mostra usuarios liberados.
 
-Somente usuarios adicionados com `xperm add @usuario` conseguem usar o menu. Dono do servidor e administradores podem gerenciar o `xperm`, mas tambem precisam estar na lista para abrir o painel.
+Somente usuarios adicionados com `nt!perm add @usuario` conseguem usar o menu. Dono do servidor e administradores podem gerenciar o `nt!perm`, mas tambem precisam estar na lista para abrir o painel.
 
 ## Onde salva
 

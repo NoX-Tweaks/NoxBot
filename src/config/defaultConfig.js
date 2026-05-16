@@ -1,4 +1,4 @@
-const DEFAULT_PREFIX = "x";
+const DEFAULT_PREFIX = "nt!";
 
 function defaultGuildConfig() {
   return {

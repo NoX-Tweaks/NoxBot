@@ -2,7 +2,7 @@ const { ActivityType } = require("discord.js");
 
 const STREAM_URL = "https://www.twitch.tv/noxtweaks";
 
-function updateBotPresence(client, prefix = "x") {
+function updateBotPresence(client, prefix = "nt!") {
   if (!client?.user) return;
   client.user.setPresence({
     activities: [{

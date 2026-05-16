@@ -10,7 +10,7 @@ const { startCall24hAutoReconnect } = require("../systems/call24h");
 function registerEvents(client) {
   client.once("clientReady", () => {
     const firstGuild = client.guilds.cache.first();
-    const config = firstGuild ? getGuildConfig(firstGuild.id) : { prefix: "x" };
+    const config = firstGuild ? getGuildConfig(firstGuild.id) : { prefix: "nt!" };
     updateBotPresence(client, config.prefix);
     startAutoMessages(client);
     startCall24hAutoReconnect(client);

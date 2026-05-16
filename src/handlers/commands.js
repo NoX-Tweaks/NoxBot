@@ -687,29 +687,50 @@ async function findMessageById(guild, messageId) {
 function helpEmbed(message, config) {
   const p = config.prefix;
   const categories = [
-    ["Principal", ["help", "menu", "site", "perm add", "perm remove", "perm list"]],
-    ["Administracao", ["bot-call", "embed", "embed editar", "addemoji"]],
-    ["Tickets", ["menu > Ticket", "criar ticket", "gerenciar ticket", "enviar painel"]],
-    ["Servidor", ["bem-vindo", "auto cargo", "auto reacoes", "auto mensagem"]],
-    ["Seguranca", ["anti links", "anti everyone", "anti spam", "anti bot", "anti ban"]],
-    ["Logs", ["banimentos", "cargos", "canais", "mensagens", "call", "tickets"]],
-    ["Personalizacao", ["prefixo", "idioma", "cor embed", "avatar", "banner"]]
+    ["Principal", [
+      [`${p}help`, "Mostra esta lista."],
+      [`${p}menu`, "Abre a central de configuracao."],
+      [`${p}site`, "Mostra o link oficial da Nox Tweaks."]
+    ]],
+    ["Administracao", [
+      [`${p}bot-call`, "Abre o painel da call 24/7."],
+      [`${p}embed`, "Abre o editor de embed."],
+      [`${p}embed editar <id_mensagem>`, "Edita uma embed enviada pelo bot."],
+      [`${p}addemoji <emoji_ou_url...> [nome]`, "Adiciona ate 10 emojis."]
+    ]],
+    ["Permissoes", [
+      [`${p}perm add @usuario`, "Libera acesso ao menu."],
+      [`${p}perm remove @usuario`, "Remove acesso ao menu."],
+      [`${p}perm list`, "Lista usuarios liberados."]
+    ]]
+  ];
+  const menuResources = [
+    "Tickets e paineis",
+    "Logs",
+    "Seguranca",
+    "Bem-vindo",
+    "Auto cargo",
+    "Auto reacoes",
+    "Auto mensagens",
+    "Personalizacao"
   ];
 
   const description = [
-    "O comando **menu** abre a central principal do Nox. Por ele voce configura tickets, logs, seguranca, embeds, personalizacao do bot e sistemas do servidor.",
+    "Esses sao os comandos reais de prefixo. As outras funcoes ficam dentro da central aberta por **menu**.",
     "",
     ...categories.flatMap(([name, commands]) => [
       `**${name}**`,
-      `\`${commands.map(command => `${p}${command}`).join("`, `")}\``,
+      ...commands.map(([command, description]) => `\`${command}\` - ${description}`),
       ""
     ]),
-    `A Nox tem atualmente **${categories.reduce((total, [, commands]) => total + commands.length, 0)} atalhos principais** no help.`,
-    `Hoje as <t:${Math.floor(Date.now() / 1000)}:T>`
+    "**Recursos pelo menu**",
+    menuResources.map(item => `\`${item}\``).join(", "),
+    "",
+    `Total: **${categories.reduce((total, [, commands]) => total + commands.length, 0)} comandos de prefixo**.`
   ].join("\n");
 
   return new EmbedBuilder()
-    .setTitle("Lista de comandos")
+    .setTitle("Comandos Nox")
     .setColor(normalizeColor(config.menuColor))
     .setDescription(description)
     .setThumbnail(message.client.user.displayAvatarURL({ size: 256 }))
