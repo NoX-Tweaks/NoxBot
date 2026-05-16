@@ -1,5 +1,5 @@
 const { PermissionsBitField } = require("discord.js");
-const { logEmbed, sendLog } = require("../utils/logs");
+const { sendLog, userLogEmbed } = require("../utils/logs");
 
 const spamMap = new Map();
 
@@ -16,12 +16,18 @@ async function runMessageSecurity(message, config) {
       .send(`${message.author}, links nao sao permitidos.`)
       .then(msg => setTimeout(() => msg.delete().catch(() => null), 5000))
       .catch(() => null);
-    return sendLog(message.guild, "security", logEmbed("Anti links", `${message.author} teve uma mensagem removida em ${message.channel}.`, 0xff4d4f));
+    return sendLog(message.guild, "security", userLogEmbed("Anti links", message.member || message.author, [
+      `Canal: ${message.channel}`,
+      "Acao: **mensagem removida**"
+    ], 0xff4d4f));
   }
 
   if (s.antiEveryone && (message.mentions.everyone || content.includes("@everyone") || content.includes("@here"))) {
     await applySecurityAction(message, s, "Anti everyone/here");
-    return sendLog(message.guild, "security", logEmbed("Anti everyone/here", `${message.author} tentou mencionar everyone/here em ${message.channel}.`, 0xff4d4f));
+    return sendLog(message.guild, "security", userLogEmbed("Anti everyone/here", message.member || message.author, [
+      `Canal: ${message.channel}`,
+      "Acao: **tentou mencionar everyone/here**"
+    ], 0xff4d4f));
   }
 
   if (s.antiSpam) {
@@ -36,7 +42,10 @@ async function runMessageSecurity(message, config) {
     if (recent.length >= Math.max(2, Number(s.spamLimit) || 6)) {
       await applySecurityAction(message, s, "Anti spam");
       spamMap.set(key, []);
-      return sendLog(message.guild, "security", logEmbed("Anti spam", `${message.author} acionou anti-spam. Acao: **${s.observeOnly ? "observar" : s.action || "timeout"}**.`, 0xff4d4f));
+      return sendLog(message.guild, "security", userLogEmbed("Anti spam", message.member || message.author, [
+        `Canal: ${message.channel}`,
+        `Acao: **${s.observeOnly ? "observar" : s.action || "timeout"}**`
+      ], 0xff4d4f));
     }
   }
 }

@@ -10,7 +10,7 @@ const {
 const { getGuildConfig, saveGuildConfig } = require("../database/guildStore");
 const { normalizeColor, safeChannel } = require("../utils/discord");
 const { isTicketStaff } = require("../utils/permissions");
-const { logEmbed, sendLog } = require("../utils/logs");
+const { logEmbed, sendLog, userLogEmbed } = require("../utils/logs");
 
 async function sendTicketPanel(interaction, config) {
   const panel = getTicketPanel(config, config.ticket.selectedPanelId);
@@ -121,7 +121,12 @@ async function openTicket(interaction) {
   const staffMentions = staffRoles.map(roleId => `<@&${roleId}>`).join(" ");
   await channel.send({ content: `${interaction.user}${staffMentions ? ` ${staffMentions}` : ""}`, embeds: [embed], components: [row] }).catch(() => null);
   await interaction.editReply(ticketOpenedReply(interaction, channel, config));
-  return sendLog(interaction.guild, "ticket", logEmbed("Ticket aberto", `${interaction.user} abriu ${channel}${option ? ` pela opcao **${option.title}**` : ""}.`, config.menuColor));
+  return sendLog(interaction.guild, "ticket", userLogEmbed("Ticket aberto", interaction.member || interaction.user, [
+    `Ticket: ${channel}`,
+    `Painel: **${basePanel.name || basePanel.title || "Ticket"}**`,
+    option ? `Opcao: **${option.title}**` : null,
+    `Horario: <t:${Math.floor(Date.now() / 1000)}:T>`
+  ], config.menuColor));
 }
 
 function getTicketPanel(config, panelId) {
@@ -219,7 +224,10 @@ async function claimTicket(interaction) {
   if (!ticket?.open) return interaction.reply({ content: "Este canal nao e um ticket aberto.", ephemeral: true });
   saveGuildConfig(interaction.guild.id, cfg => { cfg.tickets[interaction.channel.id].claimedBy = interaction.user.id; });
   await interaction.reply(`${interaction.user} assumiu este ticket.`);
-  return sendLog(interaction.guild, "ticket", logEmbed("Ticket assumido", `${interaction.user} assumiu ${interaction.channel}.`, config.menuColor));
+  return sendLog(interaction.guild, "ticket", userLogEmbed("Ticket assumido", interaction.member || interaction.user, [
+    `Ticket: ${interaction.channel}`,
+    `Assumido em: <t:${Math.floor(Date.now() / 1000)}:T>`
+  ], config.menuColor));
 }
 
 async function closeTicket(interaction, reason = "Sem motivo informado.") {
@@ -256,7 +264,12 @@ async function closeTicket(interaction, reason = "Sem motivo informado.") {
   const logChannel = safeChannel(interaction.guild, panel.logChannelId || config.logs.ticket || config.logs.basic);
   if (logChannel?.isTextBased()) {
     await logChannel.send({
-      embeds: [logEmbed("Ticket fechado", `${interaction.user} fechou ${interaction.channel}.\nMotivo: **${reason}**`, config.menuColor)],
+      embeds: [userLogEmbed("Ticket fechado", interaction.member || interaction.user, [
+        `Ticket: ${interaction.channel}`,
+        `Dono: <@${ticket.ownerId}>`,
+        `Motivo: **${reason}**`,
+        `Fechado em: <t:${Math.floor(Date.now() / 1000)}:T>`
+      ], config.menuColor)],
       files: [{ attachment: Buffer.from(transcript, "utf8"), name: `${interaction.channel.name}-transcript.txt` }]
     }).catch(() => null);
   }

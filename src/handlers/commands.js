@@ -151,20 +151,27 @@ async function handleMessageCreate(message) {
     }
 
     const args = message.content.slice(config.prefix.length).trim().split(/\s+/);
-    const emojiInput = args[1];
-    const nameInput = args[2];
-    const parsed = parseEmojiInput(emojiInput);
-    if (!parsed) {
-      return message.reply(`Use: \`${config.prefix}addemoji <emoji_ou_url> [nome]\``).catch(() => null);
+    const emojiInputs = collectEmojiInputs(message, args.slice(1)).slice(0, 10);
+    if (!emojiInputs.length) {
+      return message.reply(`Use: \`${config.prefix}addemoji <emoji_ou_url...> [nome]\` ou envie ate 10 imagens anexadas.`).catch(() => null);
     }
 
-    const name = (nameInput || parsed.name || "emoji").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 32) || "emoji";
-    const created = await message.guild.emojis.create({ attachment: parsed.url, name }).catch(error => ({ error }));
-    if (created?.error) {
-      return message.reply(`Nao consegui adicionar o emoji: ${created.error.message}`).catch(() => null);
+    const singleCustomName = emojiInputs.length === 1 ? args[2] : null;
+    const results = [];
+    for (const [index, input] of emojiInputs.entries()) {
+      const name = uniqueEmojiName(message.guild, singleCustomName || input.name || `emoji_${index + 1}`, index);
+      const created = await message.guild.emojis.create({ attachment: input.url, name }).catch(error => ({ error }));
+      results.push({ input, name, created });
     }
 
-    return message.reply(`Emoji adicionado: ${created}`).catch(() => null);
+    const success = results.filter(item => !item.created?.error);
+    const failed = results.filter(item => item.created?.error);
+    const lines = [
+      success.length ? `Adicionados (${success.length}): ${success.map(item => `${item.created}`).join(" ")}` : null,
+      failed.length ? `Falharam (${failed.length}): ${failed.map(item => `\`${item.name}\` (${item.created.error.message})`).join(", ")}` : null
+    ].filter(Boolean);
+
+    return message.reply(lines.join("\n").slice(0, 1900)).catch(() => null);
   }
 
   if (cmd === "embed") {
@@ -710,6 +717,43 @@ function parseEmojiInput(input) {
   }
 
   return null;
+}
+
+function collectEmojiInputs(message, args) {
+  const fromAttachments = message.attachments
+    .map(attachment => {
+      const url = getAttachmentImageUrl(attachment);
+      if (!url) return null;
+      return { name: attachment.name?.replace(/\.[^.]+$/, ""), url };
+    })
+    .filter(Boolean);
+
+  const fromArgs = args
+    .map(item => parseEmojiInput(item))
+    .filter(Boolean);
+
+  return [...fromAttachments, ...fromArgs];
+}
+
+function uniqueEmojiName(guild, value, index = 0) {
+  const base = sanitizeEmojiName(value) || `emoji_${index + 1}`;
+  let name = base;
+  let suffix = 1;
+  while (guild.emojis.cache.some(emoji => emoji.name === name)) {
+    const extra = String(suffix++);
+    name = `${base.slice(0, Math.max(2, 32 - extra.length - 1))}_${extra}`;
+  }
+  return name;
+}
+
+function sanitizeEmojiName(value) {
+  const name = String(value || "")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-zA-Z0-9_]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 32);
+  return name.length >= 2 ? name : null;
 }
 
 module.exports = {

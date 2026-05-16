@@ -38,7 +38,7 @@ const {
 const { modal } = require("../ui/modals");
 const { hasMenuAccess } = require("../utils/permissions");
 const { normalizeColor, resolveGuildEmojiText, yesNo } = require("../utils/discord");
-const { logEmbed, sendLog } = require("../utils/logs");
+const { logEmbed, sendLog, userLogEmbed } = require("../utils/logs");
 const { updateBotPresence } = require("../utils/presence");
 const { recordError } = require("../systems/errorStore");
 const {
@@ -122,14 +122,20 @@ async function handleButton(interaction) {
     const result = await connectCall24h(interaction.guild);
     if (!result.ok) return interaction.reply({ content: result.reason || "Nao consegui conectar nessa call.", ephemeral: true });
     const updated = markCall24hConnected(interaction.guild.id);
-    await sendLog(interaction.guild, "basic", logEmbed("Bot conectado em call", `${interaction.user} conectou o bot em ${result.channel}.`, updated.menuColor));
+    await sendLog(interaction.guild, "basic", userLogEmbed("Bot conectado em call", interaction.member || interaction.user, [
+      `Canal: ${result.channel}`,
+      `Horario: <t:${Math.floor(Date.now() / 1000)}:T>`
+    ], updated.menuColor));
     return interaction.update(callPanel(interaction.guild, updated));
   }
 
   if (interaction.customId === "botcall:disconnect") {
     disconnectCall24h(interaction.guild.id);
     const updated = markCall24hDisconnected(interaction.guild.id);
-    await sendLog(interaction.guild, "basic", logEmbed("Bot desconectado da call", `${interaction.user} desconectou o bot da call 24/7.`, updated.menuColor));
+    await sendLog(interaction.guild, "basic", userLogEmbed("Bot desconectado da call", interaction.member || interaction.user, [
+      "Acao: **desconectou o bot da call 24/7**",
+      `Horario: <t:${Math.floor(Date.now() / 1000)}:T>`
+    ], updated.menuColor));
     return interaction.update(callPanel(interaction.guild, updated));
   }
 
@@ -175,7 +181,9 @@ async function handleButton(interaction) {
       cfg.autoRole.enabled = !cfg.autoRole.enabled;
     });
     await interaction.update(serverSectionMenu(updated, "autorole"));
-    return sendLog(interaction.guild, "basic", logEmbed("Autocargo atualizado", `${interaction.user} ${updated.autoRole.enabled ? "ativou" : "desativou"} o autocargo.`));
+    return sendLog(interaction.guild, "basic", userLogEmbed("Autocargo atualizado", interaction.member || interaction.user, [
+      `Status: **${updated.autoRole.enabled ? "ativado" : "desativado"}**`
+    ], updated.menuColor));
   }
 
   if (interaction.customId === "server:autorole") {
@@ -403,7 +411,10 @@ async function handleButton(interaction) {
     const updated = saveGuildConfig(interaction.guild.id, cfg => {
       cfg.security[key] = state === "on";
     });
-    await sendLog(interaction.guild, "security", logEmbed("Seguranca atualizada", `${interaction.user} alterou \`${key}\` para **${state === "on" ? "on" : "off"}**.`));
+    await sendLog(interaction.guild, "security", userLogEmbed("Seguranca atualizada", interaction.member || interaction.user, [
+      `Protecao: \`${key}\``,
+      `Status: **${state === "on" ? "on" : "off"}**`
+    ], updated.menuColor));
     return interaction.update(securityOptionMenu(updated, key));
   }
 
@@ -1313,7 +1324,10 @@ async function handleSelect(interaction) {
       cfg.security[key] = !cfg.security[key];
     });
     await interaction.update(securityMenu(updated));
-    return sendLog(interaction.guild, "security", logEmbed("Seguranca atualizada", `${interaction.user} alterou \`${key}\` para **${updated.security[key] ? "on" : "off"}**.`));
+    return sendLog(interaction.guild, "security", userLogEmbed("Seguranca atualizada", interaction.member || interaction.user, [
+      `Protecao: \`${key}\``,
+      `Status: **${updated.security[key] ? "on" : "off"}**`
+    ], updated.menuColor));
   }
 
   if (interaction.customId === "server:logs") {

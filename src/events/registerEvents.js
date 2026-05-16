@@ -1,8 +1,9 @@
+const { AuditLogEvent } = require("discord.js");
 const { getGuildConfig } = require("../database/guildStore");
 const { saveGuildConfig } = require("../database/guildStore");
 const { handleInteractionCreate } = require("../handlers/interactions");
 const { handleMessageCreate } = require("../handlers/commands");
-const { logEmbed, sendLog } = require("../utils/logs");
+const { logEmbed, sendLog, userLogEmbed } = require("../utils/logs");
 const { updateBotPresence } = require("../utils/presence");
 const { startCall24hAutoReconnect } = require("../systems/call24h");
 
@@ -25,7 +26,9 @@ function registerEvents(client) {
     const config = getGuildConfig(member.guild.id);
     if (member.user.bot && config.security.enabled && config.security.antiBotJoin) {
       await member.kick("Anti bot join Nox Tweaks").catch(() => null);
-      await sendLog(member.guild, "antiBot", logEmbed("Anti bot join", `Bot ${member.user.tag} foi expulso automaticamente.`, config.menuColor));
+      await sendLog(member.guild, "antiBot", userLogEmbed("Anti bot join", member, [
+        "Acao: **bot expulso automaticamente**"
+      ], config.menuColor));
       return;
     }
 
@@ -34,8 +37,11 @@ function registerEvents(client) {
       const role = member.guild.roles.cache.get(autoRoleId);
       if (role) {
         await member.roles.add(role, "Autocargo Nox Tweaks")
-          .then(() => sendLog(member.guild, "roleAdd", logEmbed("Autocargo aplicado", `${member.user.tag} recebeu o cargo ${role}.`, config.menuColor)))
-          .catch(() => sendLog(member.guild, "roleAdd", logEmbed("Falha no autocargo", `Nao consegui dar o cargo ${role} para ${member.user.tag}. Verifique minha permissao e hierarquia.`, config.menuColor)));
+          .then(() => sendLog(member.guild, "roleAdd", userLogEmbed("Autocargo aplicado", member, [`Cargo: ${role}`], config.menuColor)))
+          .catch(() => sendLog(member.guild, "roleAdd", userLogEmbed("Falha no autocargo", member, [
+            `Cargo: ${role}`,
+            "Verifique minha permissao e hierarquia."
+          ], config.menuColor)));
       }
     }
 
@@ -58,39 +64,70 @@ function registerEvents(client) {
       await member.send({ content: formatWelcome(config.welcome.message, member) }).catch(() => null);
     }
 
-    await sendLog(member.guild, "memberJoin", logEmbed("Membro entrou", `${member.user.tag} entrou no servidor.`, config.menuColor));
+    await sendLog(member.guild, "memberJoin", userLogEmbed("Membro entrou", member, [
+      "Acao: **entrou no servidor**",
+      `Conta criada: <t:${Math.floor(member.user.createdTimestamp / 1000)}:F>`
+    ], config.menuColor));
   });
 
   client.on("guildMemberRemove", async (member) => {
     const config = getGuildConfig(member.guild.id);
-    await sendLog(member.guild, "memberLeave", logEmbed("Membro saiu", `${member.user.tag} saiu do servidor.`, config.menuColor));
+    await sendLog(member.guild, "memberLeave", userLogEmbed("Membro saiu", member, [
+      "Acao: **saiu do servidor**",
+      member.joinedTimestamp ? `Entrou no servidor: <t:${Math.floor(member.joinedTimestamp / 1000)}:F>` : null
+    ], config.menuColor));
   });
 
   client.on("voiceStateUpdate", async (oldState, newState) => {
     if (!oldState.channelId && newState.channelId) {
       const config = getGuildConfig(newState.guild.id);
-      return sendLog(newState.guild, "voiceTraffic", logEmbed("Entrou em call", `${newState.member.user.tag} entrou em <#${newState.channelId}>.`, config.menuColor));
+      return sendLog(newState.guild, "voiceTraffic", userLogEmbed("Entrou em call", newState.member, [
+        `Canal: <#${newState.channelId}>`,
+        `Entrada: <t:${Math.floor(Date.now() / 1000)}:T>`
+      ], config.menuColor));
     }
     if (oldState.channelId && !newState.channelId) {
       const config = getGuildConfig(oldState.guild.id);
-      return sendLog(oldState.guild, "voiceTraffic", logEmbed("Saiu de call", `${oldState.member.user.tag} saiu de <#${oldState.channelId}>.`, config.menuColor));
+      return sendLog(oldState.guild, "voiceTraffic", userLogEmbed("Saiu de call", oldState.member, [
+        `Canal: <#${oldState.channelId}>`,
+        `Saida: <t:${Math.floor(Date.now() / 1000)}:T>`
+      ], config.menuColor));
     }
     if (oldState.channelId !== newState.channelId) {
       const config = getGuildConfig(newState.guild.id);
-      return sendLog(newState.guild, "voiceTraffic", logEmbed("Moveu de call", `${newState.member.user.tag} saiu de <#${oldState.channelId}> e foi para <#${newState.channelId}>.`, config.menuColor));
+      return sendLog(newState.guild, "voiceTraffic", userLogEmbed("Moveu de call", newState.member, [
+        `Antes: <#${oldState.channelId}>`,
+        `Depois: <#${newState.channelId}>`,
+        `Horario: <t:${Math.floor(Date.now() / 1000)}:T>`
+      ], config.menuColor));
     }
   });
 
   client.on("messageDelete", async (message) => {
-    if (!message.guild || message.author?.bot) return;
+    if (!message.guild || message.partial || !message.author || message.author.bot) return;
     const config = getGuildConfig(message.guild.id);
-    await sendLog(message.guild, "messageDelete", logEmbed("Mensagem apagada", `Autor: ${message.author}\nCanal: ${message.channel}\nConteudo: ${message.cleanContent || "(sem conteudo)"}`, config.menuColor));
+    await sendLog(message.guild, "messageDelete", userLogEmbed("Mensagem apagada", message.member || message.author, [
+      `Canal: ${message.channel}`,
+      `Conteudo: ${message.cleanContent ? `\`${message.cleanContent.slice(0, 900)}\`` : "`sem conteudo`"}`
+    ], config.menuColor));
   });
 
   client.on("messageUpdate", async (oldMessage, newMessage) => {
-    if (!oldMessage.guild || oldMessage.author?.bot || oldMessage.cleanContent === newMessage.cleanContent) return;
-    const config = getGuildConfig(oldMessage.guild.id);
-    await sendLog(oldMessage.guild, "messageUpdate", logEmbed("Mensagem editada", `Autor: ${oldMessage.author}\nCanal: ${oldMessage.channel}\nAntes: ${oldMessage.cleanContent || "(vazio)"}\nDepois: ${newMessage.cleanContent || "(vazio)"}`, config.menuColor));
+    if (!newMessage.guild || oldMessage.partial || newMessage.partial) return;
+    const author = newMessage.author || oldMessage.author;
+    if (!author || author.bot) return;
+
+    const before = oldMessage.cleanContent || oldMessage.content || "";
+    const after = newMessage.cleanContent || newMessage.content || "";
+    if (!before && !after) return;
+    if (before === after) return;
+
+    const config = getGuildConfig(newMessage.guild.id);
+    await sendLog(newMessage.guild, "messageUpdate", userLogEmbed("Mensagem editada", newMessage.member || author, [
+      `Canal: ${newMessage.channel}`,
+      `Antes: ${before ? `\`${before.slice(0, 500)}\`` : "`vazio`"}`,
+      `Depois: ${after ? `\`${after.slice(0, 500)}\`` : "`vazio`"}`
+    ], config.menuColor));
   });
 
   client.on("messageCreate", async (message) => {
@@ -113,32 +150,66 @@ function registerEvents(client) {
 
   client.on("channelDelete", async (channel) => {
     const config = getGuildConfig(channel.guild.id);
-    await sendLog(channel.guild, "channelDelete", logEmbed("Canal deletado", `Canal \`${channel.name}\` foi deletado. Verifique auditoria do servidor.`, config.menuColor));
+    const executor = await findAuditExecutor(channel.guild, AuditLogEvent.ChannelDelete, channel.id);
+    const embed = executor
+      ? userLogEmbed("Canal deletado", executor, [`Canal: \`${channel.name}\``, `ID canal: \`${channel.id}\``], config.menuColor)
+      : logEmbed("Canal deletado", `Canal \`${channel.name}\` foi deletado.\nID: \`${channel.id}\`\nVerifique auditoria do servidor.`, config.menuColor);
+    await sendLog(channel.guild, "channelDelete", embed);
   });
 
   client.on("roleDelete", async (role) => {
     const config = getGuildConfig(role.guild.id);
-    await sendLog(role.guild, "roleDelete", logEmbed("Cargo deletado", `Cargo \`${role.name}\` foi deletado. Verifique auditoria do servidor.`, config.menuColor));
+    const executor = await findAuditExecutor(role.guild, AuditLogEvent.RoleDelete, role.id);
+    const embed = executor
+      ? userLogEmbed("Cargo deletado", executor, [`Cargo: \`${role.name}\``, `ID cargo: \`${role.id}\``], config.menuColor)
+      : logEmbed("Cargo deletado", `Cargo \`${role.name}\` foi deletado.\nID: \`${role.id}\`\nVerifique auditoria do servidor.`, config.menuColor);
+    await sendLog(role.guild, "roleDelete", embed);
   });
 
   client.on("channelCreate", async (channel) => {
     const config = getGuildConfig(channel.guild.id);
-    await sendLog(channel.guild, "channelCreate", logEmbed("Canal criado", `Canal ${channel} foi criado.`, config.menuColor));
+    const executor = await findAuditExecutor(channel.guild, AuditLogEvent.ChannelCreate, channel.id);
+    const embed = executor
+      ? userLogEmbed("Canal criado", executor, [`Canal: ${channel}`, `ID canal: \`${channel.id}\``], config.menuColor)
+      : logEmbed("Canal criado", `Canal ${channel} foi criado.\nID: \`${channel.id}\``, config.menuColor);
+    await sendLog(channel.guild, "channelCreate", embed);
   });
 
   client.on("channelUpdate", async (oldChannel, newChannel) => {
     const config = getGuildConfig(newChannel.guild.id);
-    await sendLog(newChannel.guild, "channelUpdate", logEmbed("Canal atualizado", `Canal ${newChannel} foi atualizado.\nAntes: \`${oldChannel.name}\`\nDepois: \`${newChannel.name}\``, config.menuColor));
+    const executor = await findAuditExecutor(newChannel.guild, AuditLogEvent.ChannelUpdate, newChannel.id);
+    const embed = executor
+      ? userLogEmbed("Canal atualizado", executor, [
+        `Canal: ${newChannel}`,
+        `ID canal: \`${newChannel.id}\``,
+        `Antes: \`${oldChannel.name}\``,
+        `Depois: \`${newChannel.name}\``
+      ], config.menuColor)
+      : logEmbed("Canal atualizado", `Canal ${newChannel} foi atualizado.\nAntes: \`${oldChannel.name}\`\nDepois: \`${newChannel.name}\``, config.menuColor);
+    await sendLog(newChannel.guild, "channelUpdate", embed);
   });
 
   client.on("roleCreate", async (role) => {
     const config = getGuildConfig(role.guild.id);
-    await sendLog(role.guild, "roleCreate", logEmbed("Cargo criado", `Cargo ${role} foi criado.`, config.menuColor));
+    const executor = await findAuditExecutor(role.guild, AuditLogEvent.RoleCreate, role.id);
+    const embed = executor
+      ? userLogEmbed("Cargo criado", executor, [`Cargo: ${role}`, `ID cargo: \`${role.id}\``], config.menuColor)
+      : logEmbed("Cargo criado", `Cargo ${role} foi criado.\nID: \`${role.id}\``, config.menuColor);
+    await sendLog(role.guild, "roleCreate", embed);
   });
 
   client.on("roleUpdate", async (oldRole, newRole) => {
     const config = getGuildConfig(newRole.guild.id);
-    await sendLog(newRole.guild, "roleUpdate", logEmbed("Cargo atualizado", `Cargo ${newRole} foi atualizado.\nAntes: \`${oldRole.name}\`\nDepois: \`${newRole.name}\``, config.menuColor));
+    const executor = await findAuditExecutor(newRole.guild, AuditLogEvent.RoleUpdate, newRole.id);
+    const embed = executor
+      ? userLogEmbed("Cargo atualizado", executor, [
+        `Cargo: ${newRole}`,
+        `ID cargo: \`${newRole.id}\``,
+        `Antes: \`${oldRole.name}\``,
+        `Depois: \`${newRole.name}\``
+      ], config.menuColor)
+      : logEmbed("Cargo atualizado", `Cargo ${newRole} foi atualizado.\nAntes: \`${oldRole.name}\`\nDepois: \`${newRole.name}\``, config.menuColor);
+    await sendLog(newRole.guild, "roleUpdate", embed);
   });
 
   client.on("guildMemberUpdate", async (oldMember, newMember) => {
@@ -146,20 +217,30 @@ function registerEvents(client) {
     const added = newMember.roles.cache.filter(role => !oldMember.roles.cache.has(role.id));
     const removed = oldMember.roles.cache.filter(role => !newMember.roles.cache.has(role.id));
     for (const role of added.values()) {
-      await sendLog(newMember.guild, "roleAdd", logEmbed("Cargo adicionado", `${newMember.user.tag} recebeu ${role}.`, config.menuColor));
+      await sendLog(newMember.guild, "roleAdd", userLogEmbed("Cargo adicionado", newMember, [`Cargo: ${role}`], config.menuColor));
     }
     for (const role of removed.values()) {
-      await sendLog(newMember.guild, "roleRemove", logEmbed("Cargo removido", `${newMember.user.tag} perdeu ${role}.`, config.menuColor));
+      await sendLog(newMember.guild, "roleRemove", userLogEmbed("Cargo removido", newMember, [`Cargo: ${role}`], config.menuColor));
     }
     if (!oldMember.communicationDisabledUntil && newMember.communicationDisabledUntil) {
-      await sendLog(newMember.guild, "muteText", logEmbed("Membro silenciado", `${newMember.user.tag} foi silenciado no chat.`, config.menuColor));
+      await sendLog(newMember.guild, "muteText", userLogEmbed("Membro silenciado", newMember, [
+        `Ate: <t:${Math.floor(newMember.communicationDisabledUntil.getTime() / 1000)}:F>`
+      ], config.menuColor));
     }
     if (oldMember.communicationDisabledUntil && !newMember.communicationDisabledUntil) {
-      await sendLog(newMember.guild, "muteText", logEmbed("Silenciamento removido", `${newMember.user.tag} teve o silenciamento removido.`, config.menuColor));
+      await sendLog(newMember.guild, "muteText", userLogEmbed("Silenciamento removido", newMember, [
+        "Acao: **timeout removido**"
+      ], config.menuColor));
     }
     if (!oldMember.premiumSince && newMember.premiumSince && config.autoRole.enabled && config.autoRole.boosterRoleId) {
       const role = newMember.guild.roles.cache.get(config.autoRole.boosterRoleId);
       if (role) await newMember.roles.add(role, "Autocargo booster Nox Tweaks").catch(() => null);
+    }
+    if (!oldMember.premiumSince && newMember.premiumSince) {
+      await sendLog(newMember.guild, "basic", userLogEmbed("Novo boost no servidor", newMember, [
+        "Acao: **impulsionou o servidor**",
+        `Boost desde: <t:${Math.floor(newMember.premiumSinceTimestamp / 1000)}:F>`
+      ], "#ff73c7"));
     }
   });
 
@@ -167,15 +248,22 @@ function registerEvents(client) {
     const config = getGuildConfig(ban.guild.id);
     if (config.security.enabled && config.security.antiBan) {
       await ban.guild.members.unban(ban.user.id, "Anti ban Nox Tweaks").catch(() => null);
-      await sendLog(ban.guild, "ban", logEmbed("Anti ban", `${ban.user.tag} foi desbanido automaticamente. Verifique auditoria do servidor.`, config.menuColor));
+      await sendLog(ban.guild, "ban", userLogEmbed("Anti ban", ban.user, [
+        "Acao: **usuario desbanido automaticamente**",
+        "Verifique auditoria do servidor."
+      ], config.menuColor));
     } else {
-      await sendLog(ban.guild, "ban", logEmbed("Usuario banido", `${ban.user.tag} foi banido do servidor.`, config.menuColor));
+      await sendLog(ban.guild, "ban", userLogEmbed("Usuario banido", ban.user, [
+        "Acao: **banido do servidor**"
+      ], config.menuColor));
     }
   });
 
   client.on("guildBanRemove", async (ban) => {
     const config = getGuildConfig(ban.guild.id);
-    await sendLog(ban.guild, "unban", logEmbed("Usuario desbanido", `${ban.user.tag} foi desbanido do servidor.`, config.menuColor));
+    await sendLog(ban.guild, "unban", userLogEmbed("Usuario desbanido", ban.user, [
+      "Acao: **desbanido do servidor**"
+    ], config.menuColor));
   });
 }
 
@@ -213,6 +301,15 @@ function formatWelcome(template, member) {
     .replaceAll("{member}", `${member}`)
     .replaceAll("{username}", member.user.username)
     .replaceAll("{servername}", member.guild.name);
+}
+
+async function findAuditExecutor(guild, type, targetId) {
+  const logs = await guild.fetchAuditLogs({ type, limit: 5 }).catch(() => null);
+  const entry = logs?.entries?.find(item => {
+    const target = item.target;
+    return !targetId || target?.id === targetId;
+  });
+  return entry?.executor || null;
 }
 
 module.exports = {

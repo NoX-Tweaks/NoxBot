@@ -10,6 +10,31 @@ function logEmbed(title, description, color = "#2B6CFF") {
     .setTimestamp();
 }
 
+function userLogEmbed(title, userOrMember, details = [], color = "#2B6CFF") {
+  const user = userOrMember?.user || userOrMember;
+  const member = userOrMember?.user ? userOrMember : null;
+  const tag = user?.tag || user?.username || "Desconhecido";
+  const id = user?.id || "N/A";
+  const lines = Array.isArray(details) ? details : [details];
+  const embed = new EmbedBuilder()
+    .setTitle(title)
+    .setColor(normalizeColor(String(color)))
+    .setThumbnail(user?.displayAvatarURL?.({ size: 256 }) || null)
+    .setDescription([
+      `Usuario: ${user ? `${user}` : "`N/A`"}`,
+      `Nome: **${tag}**`,
+      member?.displayName && member.displayName !== user?.username ? `Apelido: **${member.displayName}**` : null,
+      `ID: \`${id}\``,
+      "",
+      ...lines.filter(Boolean),
+      "",
+      `Data: <t:${Math.floor(Date.now() / 1000)}:F>`
+    ].filter(Boolean).join("\n"))
+    .setFooter({ text: `ID: ${id}` })
+    .setTimestamp();
+  return embed;
+}
+
 function guildEmbed(guild, title, description, color = null) {
   const config = getGuildConfig(guild.id);
   return logEmbed(title, description, color || config.menuColor);
@@ -33,5 +58,6 @@ async function sendLog(guild, type, embed) {
 module.exports = {
   guildEmbed,
   logEmbed,
-  sendLog
+  sendLog,
+  userLogEmbed
 };
