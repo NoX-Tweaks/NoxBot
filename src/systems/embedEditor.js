@@ -67,8 +67,7 @@ function updateEmbedSession(guildId, userId, updater) {
 
 function buildSessionEmbed(session) {
   const embed = new EmbedBuilder()
-    .setTitle(session.title || "Nox Tweaks")
-    .setDescription(session.description || "Configure esta embed.")
+    .setDescription(renderHeadingDescription(session.title || "Nox Tweaks", session.description || "Configure esta embed."))
     .setColor(normalizeColor(session.color || "#2B6CFF"));
   if (session.image) embed.setImage(session.image);
   if (session.thumbnail) embed.setThumbnail(session.thumbnail);
@@ -78,6 +77,18 @@ function buildSessionEmbed(session) {
     if (field?.name && field?.value) embed.addFields({ name: field.name, value: field.value, inline: Boolean(field.inline) });
   }
   return embed;
+}
+
+function renderHeadingDescription(title, description) {
+  return [
+    title ? renderHeading(title) : null,
+    description || null
+  ].filter(Boolean).join("\n");
+}
+
+function renderHeading(value) {
+  const text = String(value || "").trim();
+  return text.startsWith("#") ? text : `# ${text}`;
 }
 
 function buildSessionComponents(session) {

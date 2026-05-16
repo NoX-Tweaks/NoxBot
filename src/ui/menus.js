@@ -550,9 +550,14 @@ function renderTicketEmbedItems(items, fallback) {
 
 function renderTicketTextItem(item) {
   return [
-    item.title ? `# ${item.title}` : null,
+    item.title ? renderHeading(item.title) : null,
     item.description || null
   ].filter(Boolean).join("\n");
+}
+
+function renderHeading(value) {
+  const text = String(value || "").trim();
+  return text.startsWith("#") ? text : `# ${text}`;
 }
 
 function renderTicketSeparator(item) {
@@ -585,7 +590,8 @@ function ticketSelectMenuPanel(config, panelId) {
     .addOptions(options.length ? options.slice(0, 25).map(option => ({
       label: option.title.slice(0, 100),
       value: option.id,
-      description: (option.description || "Sem descricao").slice(0, 100)
+      description: (option.description || "Sem descricao").slice(0, 100),
+      emoji: cleanEmoji(option.emoji)
     })) : [{ label: "Nenhuma opcao criada", value: "none" }]);
 
   const row = new ActionRowBuilder().addComponents(
@@ -913,8 +919,7 @@ function navigationRow(current = "inicio") {
 function buildCustomEmbed(config) {
   const data = config.embed;
   const embed = new EmbedBuilder()
-    .setTitle(data.title || "Nox Tweaks")
-    .setDescription(data.description || "Configure esta embed pelo menu.")
+    .setDescription(renderEmbedHeadingDescription(data.title || "Nox Tweaks", data.description || "Configure esta embed pelo menu."))
     .setColor(normalizeColor(data.color))
     .setTimestamp();
   if (data.footer) embed.setFooter({ text: data.footer });
@@ -925,6 +930,13 @@ function buildCustomEmbed(config) {
     if (field?.name && field?.value) embed.addFields({ name: field.name, value: field.value, inline: Boolean(field.inline) });
   }
   return embed;
+}
+
+function renderEmbedHeadingDescription(title, description) {
+  return [
+    title ? renderHeading(title) : null,
+    description || null
+  ].filter(Boolean).join("\n");
 }
 
 module.exports = {

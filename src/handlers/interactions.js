@@ -74,7 +74,7 @@ async function handleInteractionCreate(interaction) {
 
   try {
     if (interaction.isButton() || interaction.isAnySelectMenu()) {
-      const publicTicketAction = interaction.customId.startsWith("ticket:open:") || ["ticket:claim", "ticket:close", "ticket:delete"].includes(interaction.customId);
+      const publicTicketAction = /^ticket:open(?:Button)?:/.test(interaction.customId) || ["ticket:claim", "ticket:close", "ticket:delete"].includes(interaction.customId);
       if (!publicTicketAction && !hasMenuAccess(interaction.member)) {
         return interaction.reply({ content: `${interaction.member}, voce nao tem acesso ao painel. Peca para alguem que tenha permissao liberar voce.`, ephemeral: true });
       }
@@ -710,12 +710,12 @@ async function handleButton(interaction) {
   }
 
   if (["ticket:toggleTopic"].includes(interaction.customId)) {
-    const map = {
-      "ticket:toggleTopic": "useTopic"
-    };
     const updated = saveGuildConfig(interaction.guild.id, cfg => {
       const panel = cfg.ticketPanels[cfg.ticket.selectedPanelId];
-      if (panel) panel[map[interaction.customId]] = !panel[map[interaction.customId]];
+      if (panel) {
+        panel.useTopic = !panel.useTopic;
+        if (panel.useTopic) panel.categoryId = null;
+      }
     });
     return interaction.update(ticketManageMenu(updated, updated.ticket.selectedPanelId));
   }
@@ -844,7 +844,7 @@ async function handleSelect(interaction) {
     return interaction.update(callPanel(interaction.guild, updated));
   }
 
-  if (interaction.customId.startsWith("ticket:open:")) {
+  if (interaction.customId.startsWith("ticket:open")) {
     return openTicket(interaction);
   }
 
@@ -1270,7 +1270,10 @@ async function handleSelect(interaction) {
   if (interaction.customId === "ticket:setCategorySelect") {
     const updated = saveGuildConfig(interaction.guild.id, cfg => {
       const panel = cfg.ticketPanels[cfg.ticket.selectedPanelId];
-      if (panel) panel.categoryId = interaction.values[0];
+      if (panel) {
+        panel.categoryId = interaction.values[0];
+        panel.useTopic = false;
+      }
     });
     return interaction.update({ content: null, ...ticketManageMenu(updated, updated.ticket.selectedPanelId) });
   }
@@ -1534,6 +1537,7 @@ async function handleModal(interaction) {
       if (!panelId || !cfg.ticketPanels[panelId]) return;
       cfg.ticketPanels[panelId].panelChannelId = panelChannelId || null;
       cfg.ticketPanels[panelId].categoryId = category || null;
+      if (category) cfg.ticketPanels[panelId].useTopic = false;
       cfg.ticketPanels[panelId].staffRoleId = staff || null;
       cfg.ticketPanels[panelId].staffRoleIds = staff ? [staff] : [];
       cfg.ticketPanels[panelId].logChannelId = log || null;
@@ -1743,6 +1747,7 @@ async function handleModal(interaction) {
       const option = panel?.selectOptions?.find(item => item.id === panel.selectedSelectOptionId);
       if (!option) return;
       option.categoryId = /^\d{17,20}$/.test(categoryId) ? categoryId : null;
+      if (option.categoryId) panel.useTopic = false;
       option.channelPrefix = sanitizeChannelPrefix(channelPrefix || option.title || "ticket");
       option.roleIds = roleIds;
     });

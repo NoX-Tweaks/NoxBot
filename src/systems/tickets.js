@@ -43,7 +43,7 @@ async function sendTicketPanel(interaction, config) {
   if (panel.useButton !== false) {
     const button = panel.button || {};
     const builder = new ButtonBuilder()
-      .setCustomId(`ticket:open:${panel.id}`)
+      .setCustomId(`ticket:openButton:${panel.id}`)
       .setLabel(button.label || "Abrir Ticket")
       .setStyle(buttonStyle(button.color));
     const emoji = cleanEmoji(button.emoji);
@@ -178,9 +178,14 @@ function renderItems(items, fallback) {
 
 function renderTextItem(item) {
   return [
-    item.title ? `# ${item.title}` : null,
+    item.title ? renderHeading(item.title) : null,
     item.description || null
   ].filter(Boolean).join("\n");
+}
+
+function renderHeading(value) {
+  const text = String(value || "").trim();
+  return text.startsWith("#") ? text : `# ${text}`;
 }
 
 function renderSeparator(item) {
@@ -295,6 +300,7 @@ function applyTicketOption(panel, option) {
     ...panel,
     selectedOptionId: option.id,
     categoryId: option.categoryId || panel.categoryId,
+    useTopic: option.categoryId ? false : panel.useTopic,
     staffRoleIds: option.roleIds?.length ? option.roleIds : panel.staffRoleIds,
     staffRoleId: option.roleIds?.[0] || panel.staffRoleId,
     channelPrefix: option.channelPrefix || panel.channelPrefix || option.title || "ticket",
