@@ -91,24 +91,7 @@ async function handleMessageCreate(message) {
   }
 
   if (cmd === "help") {
-    const p = config.prefix;
-    const embed = new EmbedBuilder()
-      .setTitle("Ajuda Nox Tweaks")
-      .setColor(config.menuColor)
-      .setDescription(`Prefixo atual: \`${p}\``)
-      .addFields(
-        { name: `${p}menu`, value: "Abre o menu principal de configuracao." },
-        { name: `${p}perm add @usuario`, value: "Da acesso ao menu para um usuario." },
-        { name: `${p}perm remove @usuario`, value: "Remove o acesso ao menu de um usuario." },
-        { name: `${p}perm list`, value: "Mostra usuarios com acesso ao menu." },
-        { name: `${p}bot-call`, value: "Abre o painel de call 24/7." },
-        { name: `${p}site`, value: "Mostra o link oficial da Nox Tweaks." },
-        { name: `${p}embed editar <id_mensagem>`, value: "Abre o editor visual de uma embed enviada pelo bot." },
-        { name: `${p}help`, value: "Mostra esta mensagem." }
-      )
-      .setFooter({ text: "O prefixo inicial e x, mas pode ser alterado em Personalizar." });
-
-    return message.reply({ embeds: [embed] }).catch(() => null);
+    return message.reply({ embeds: [helpEmbed(message, config)] }).catch(() => null);
   }
 
   if (cmd === "bot-call") {
@@ -699,6 +682,39 @@ async function findMessageById(guild, messageId) {
   }
 
   return null;
+}
+
+function helpEmbed(message, config) {
+  const p = config.prefix;
+  const categories = [
+    ["Principal", ["help", "menu", "site", "perm add", "perm remove", "perm list"]],
+    ["Administracao", ["bot-call", "embed", "embed editar", "addemoji"]],
+    ["Tickets", ["menu > Ticket", "criar ticket", "gerenciar ticket", "enviar painel"]],
+    ["Servidor", ["bem-vindo", "auto cargo", "auto reacoes", "auto mensagem"]],
+    ["Seguranca", ["anti links", "anti everyone", "anti spam", "anti bot", "anti ban"]],
+    ["Logs", ["banimentos", "cargos", "canais", "mensagens", "call", "tickets"]],
+    ["Personalizacao", ["prefixo", "idioma", "cor embed", "avatar", "banner"]]
+  ];
+
+  const description = [
+    "O comando **menu** abre a central principal do Nox. Por ele voce configura tickets, logs, seguranca, embeds, personalizacao do bot e sistemas do servidor.",
+    "",
+    ...categories.flatMap(([name, commands]) => [
+      `**${name}**`,
+      `\`${commands.map(command => `${p}${command}`).join("`, `")}\``,
+      ""
+    ]),
+    `A Nox tem atualmente **${categories.reduce((total, [, commands]) => total + commands.length, 0)} atalhos principais** no help.`,
+    `Hoje as <t:${Math.floor(Date.now() / 1000)}:T>`
+  ].join("\n");
+
+  return new EmbedBuilder()
+    .setTitle("Lista de comandos")
+    .setColor(normalizeColor(config.menuColor))
+    .setDescription(description)
+    .setThumbnail(message.client.user.displayAvatarURL({ size: 256 }))
+    .setFooter({ text: `Prefixo atual: ${p}` })
+    .setTimestamp();
 }
 
 function parseEmojiInput(input) {
